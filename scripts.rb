@@ -17,15 +17,17 @@
  *   - and simply run the script (type in 'ruby scripts.rb')
  * 
  * After running for the first time, you should see a folder named 
- * '#{yourProjectName}-Scripts' next to your project folder. On subsequent
+ * '#{yourProjectName}_scripts' next to your project folder. On subsequent
  * runs, the script will make a new Scripts.rvdata2 file from the scripts in 
  * the scripts folder. 
  *
- * NOTES: 
+ * USAGE NOTES: 
  * To prevent an old version of Scripts.rvdata2 from overwriting your import,
  * it is recommended that the RPG Maker application is closed while running
- * this script.
- * 
+ * this script. Also, editing the scripts in RPG Maker will not affect the 
+ * scripts in the scripts folder. Be sure to edit the scripts in the scripts
+ * folder if you actually want to save them.
+ *
  * Set AUTOPLAYTEST to false if you want to import or export without 
  * playtesting the game.
  *
@@ -40,7 +42,8 @@ AUTOPLAYTEST = true
 # Important paths
 SCRIPTS_DATA = "Data/Scripts.rvdata2"
 PROJECT = File.basename(Dir.getwd)
-SCRIPTS_FOLDER = "../#{PROJECT}-Scripts"
+SCRIPTS_FOLDER = "../#{PROJECT}_scripts"
+SCRIPTS_INCLUDE = "#{SCRIPTS_FOLDER}/script_include.txt"
 
 #-----------------------------------------------------------------------------
 # Export functions
@@ -56,12 +59,22 @@ def read_object_from_file(file)
 end
 
 #
+# Exports the names and order of the scripts you want include in your import
+#
+def export_script_include(scripts)
+  script_names = scripts.map { |script| script[1] }
+  File.write(SCRIPTS_INCLUDE, script_names.join("\n"))
+end
+
+#
 # Export scripts
 #
 def export_scripts
+  scripts = read_object_from_file(SCRIPTS_DATA)
+
   FileUtils.mkdir_p(SCRIPTS_FOLDER)
 
-  scripts = read_object_from_file(SCRIPTS_DATA)
+  export_script_include(scripts)
 
   folder = false
   script_folder = ""
@@ -97,18 +110,50 @@ end
 #
 # Serializes object data and writes data into file 
 #
-def write_object_to_file(data, file)
+def write_object_to_file(file, data)
   File.open(file, "wb") do |f|
     Marshal.dump(data, f)
   end
 end
 
-# Zlib::Deflate.deflate(string, level = Zlib::BEST_COMPRESSION)
-
 #
 # Import scripts
 #
 def import_scripts
+  script_names = File.read(SCRIPTS_INCLUDE, :encoding => 'utf-8').split("\n")
+
+  folder = false
+  script_folder = ""
+
+  data = Array.new
+
+  script_names.each do |script_name|
+    script_data = Array.new(3)
+    script_data[0] = 42
+    script_data[1] = script_name
+
+    # Not a script
+    if script_name == ""
+      folder = true
+      script_data[2] = Zlib::Deflate.deflate("", Zlib::BEST_COMPRESSION)
+
+    # Found holding folder
+    elsif folder
+      script_folder = "#{SCRIPTS_FOLDER}/#{script_name}"
+      folder = false
+      script_data[2] = Zlib::Deflate.deflate("", Zlib::BEST_COMPRESSION)
+
+    # Import script
+    else
+      script_path = "#{script_folder}/#{script_name}.rb"
+      script = File.read(script_path, :encoding => 'utf-8')
+      script_data[2] = Zlib::Deflate.deflate(script, Zlib::BEST_COMPRESSION)
+    end
+
+    data.push(script_data)
+  end
+
+  write_object_to_file(SCRIPTS_DATA, data)
 end
 
 #-----------------------------------------------------------------------------
@@ -133,7 +178,7 @@ def main
   else
     puts "Scripts folder not found. Exporting scripts..."
     export_scripts
-    puts "Export complete."
+    puts "Export complete. Your scripts are in #{SCRIPTS_FOLDER}"
   end
 
   if AUTOPLAYTEST
