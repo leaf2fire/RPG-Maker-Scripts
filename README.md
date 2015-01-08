@@ -1,4 +1,4 @@
-RPGMaker-Scripts
+RPGMaker_Scripts
 =================
 
 Scripts for RPGVXAce
