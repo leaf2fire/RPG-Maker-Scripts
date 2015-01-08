@@ -183,7 +183,7 @@ def main
 
   if AUTOPLAYTEST
     puts "Starting Game..."
-    exec("Game.exe")
+    exec("Game.exe console")
   end
 end
 
